@@ -1,25 +1,109 @@
 ---
-title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+title: "Assignment 1"
+output: html_document
 ---
 
+In this assignment, we will be exploring the movement activity of a subject whose steps have been recorded for a period of two months, with measurements in buckets of 5-minutes intervals.
 
-## Loading and preprocessing the data
+Importing steps dataset into R.
+
+```{r}
+data <- read.csv("activity.csv")
+```
+
+We first take a quick look at the dataset's dimensions, variable names and see whether any missing values are present.
+
+```{r}
+dim(data)
+names(data)
+data$missingValues <- as.numeric(is.na(data$step))
+sum(data$missingValues)
+```
+
+Our dataset consists of 17,568 observations, with three columns "Steps", "Date" and "Interval" validating assignment guidelines.
+
+The Dataset contains 2304 missing Values which correspond to around 13% of total observations
+
+We first change the class of date from factor to Date format, to plot the data later as a time-series.
+
+```{r}
+data$date <- as.Date(data$date)
+```
+
+As per guidelines, we first plot the histogram of Steps per day
+
+```{r, echo=TRUE}
+library(dplyr)
+dailytotal <- summarise(group_by(data,date), sum(steps, na.rm=T))
+names(dailytotal) <- c("Date", "TotalSteps")
+hist(dailytotal$TotalSteps, xlab ="Steps per Day", main ="Steps Distribution within Day")
+```
+
+We observe that the number of steps taken within the day is slightly positively skewed (to the left).
+
+We now turn to descriptive statistics to make better sense of how many steps are being taken every 5 minutes by the subject assessed.
+
+```{r}
+mean(dailytotal$TotalSteps)
+median(dailytotal$TotalSteps)
+```
+
+We find that the subject walked on average 9354.23 Steps during a day, while 50% of the days, subject walked a total of 10,395 steps. The fact that the mean is smaller than the median validates our finding that the distribution is positively skewed.
+
+We now plot the time-Series for average steps taken in a given 5-Minute Interval within the day, averaged out across all similar interval in the dataset.
+
+```{r, echo = TRUE}
+library(dplyr)
+library(ggplot2)
+IntervalAverages <- summarise(group_by(data, interval), mean(steps, na.rm=T))
+names(IntervalAverages) <- c("Interval", "AverageSteps")
+IntAve <- ggplot(IntervalAverages,aes(Interval, AverageSteps))
+IntAve + geom_line()
+```
+
+We can see that the interval during which the subject has taken the highest number of steps is the 835th interval, with an average of 206.2 steps.
+
+We now turn to missing data imputation. We have already seen that 13% of observations are missing (2304 Obs), and we will consider using the Interval average across the two-months recording period as an imputation reference for all missing values.
+
+```{r, echo = TRUE}
+library(dplyr)
+#Indexing the Average Interval Value into the dataset if steps is missing
+data2 <- merge(data, IntervalAverages, by.x="interval", by.y="Interval")
+data2<- mutate(data2, ImputedSteps = ifelse(missingValues==1,AverageSteps,steps))
+data2$steps <- NULL
+
+#Create dataframe with total steps taken per day
+dailytotal2 <- summarise(group_by(data2,date), sum(ImputedSteps))
+names(dailytotal2) <- c("Date", "TotalSteps")
+hist(dailytotal2$TotalSteps, xlab ="Steps per Day", main ="Steps Distribution within Day")
+```
+
+After plotting the imputed dataset, we observe a shift in centrality, through a reduction in skewness and a more central distribution.
+
+To validate our previous claim we compute the mean and median of the imputed dataset.
+
+```{r}
+mean(dailytotal2$TotalSteps)
+median(dailytotal2$TotalSteps)
+```
+
+The new observed average is of 10766.19 steps per day, and the median corresponds now to the same value of 10766.19 steps. This validates our finding that the distribution has gained in centrality.
+
+We will now explore the difference in movement patterns between weekends and weekdays.
+
+```{r}
+library(dplyr)
+library(ggplot2)
+data2$day <- weekdays(data2$date)
+weekend <- c("Saturday","Sunday")
+data2 <- mutate(data2, WeekDay = ifelse(day %in% weekend, "WeekDay","Weekend"))
+IntervalAverages2 <- summarise(group_by(data2,interval,WeekDay), mean(ImputedSteps))
+names(IntervalAverages2) <- c("Interval", "Weekday","TotalSteps")
+WeekdayDist <- ggplot(IntervalAverages2, aes(Interval, TotalSteps))
+WeekdayDist + geom_line() + facet_grid(Weekday~.)
+```
+
+We observe from the panel plot that the distribution of steps during the weekdays is irregular between interval 750 and 1000, whereas during the weekend the pattern is more regular across all intervals of activity. (maybe subject walks to work?)
 
 
 
-## What is mean total number of steps taken per day?
-
-
-
-## What is the average daily activity pattern?
-
-
-
-## Imputing missing values
-
-
-
-## Are there differences in activity patterns between weekdays and weekends?
